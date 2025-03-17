@@ -65,7 +65,7 @@ void nm_node_machine_destroy(nm_node_machine_t* p_machine);
 void nm_node_machine_process(nm_node_machine_t* p_machine);
 void nm_node_machine_render(nm_node_machine_t* p_machine);
 
-nm_node_t* nm_node_machine_get_core(nm_node_machine_t* p_machine);
+nm_node_t* nm_node_machine_get_root(nm_node_machine_t* p_machine);
 
 bool nm_node_machine_add_node(nm_node_machine_t* p_machine, nm_node_t* p_node, int16_t p_type);
 void nm_node_machine_remove_node(nm_node_machine_t* p_machine, int16_t p_type);

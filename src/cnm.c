@@ -49,6 +49,22 @@ struct node_t {
 
 };
 
+struct node_machine_t {
+	// Pointer to the root node
+
+	struct node_t* _root;
+
+	// Container of the node state
+
+	struct node_t* _node_states[NM_NODE_STATE];
+
+	// Pointer to the current state
+
+	struct node_t* _current_state;
+};
+
+// Local function declaration
+
 static void _node_in_init(struct node_t* p_node);
 static void _node_in_destroy(struct node_t* p_node);
 static void _node_in_awake(struct node_t* p_node);
@@ -56,7 +72,11 @@ static void _node_in_sleep(struct node_t* p_node);
 static void _node_in_process(struct node_t* p_node);
 static void _node_in_render(struct node_t* p_node);
 
+static void _node_machine_in_process(struct node_t* p_node);
+static void _node_machine_in_render(struct node_t* p_node);
+
 static uint64_t _get_hash_key(const char* p_key);
+
 
 // Function Definition
 
@@ -282,6 +302,34 @@ void nm_node_emit_signal(nm_node_t* p_node, const char* p_signal_name){
     }
 }
 
+nm_node_machine_t* nm_node_machine_create(){
+	struct node_machine_t* l_machine = (struct node_machine_t*)malloc(sizeof(struct node_machine_t));
+
+	l_machine->_root = nm_node_create(l_machine, NULL, NULL, NULL, NULL, _node_machine_in_process, _node_machine_in_render);
+
+	memset(l_machine->_node_states, 0, sizeof(l_machine->_node_states));
+
+	l_machine->_current_state = NULL;
+
+	return l_machine;
+}
+
+void nm_node_machine_destroy(nm_node_machine_t* p_machine){
+	free(p_machine);
+}
+
+void nm_node_machine_process(nm_node_machine_t* p_machine){
+	p_machine->_root->_in_process(p_machine->_root);
+}
+
+void nm_node_machine_render(nm_node_machine_t* p_machine){
+	p_machine->_root->_in_render(p_machine->_root);
+}
+
+nm_node_t* nm_node_machine_get_root(nm_node_machine_t* p_machine){
+	return p_machine->_root;
+}
+
 // Local function definition
 
 static void _node_in_init(struct node_t* p_node){
@@ -354,6 +402,22 @@ static void _node_in_render(struct node_t* p_node){
 
         p_node->_child[i]->_in_render(p_node->_child[i]);
     }
+}
+
+static void _node_machine_in_process(struct node_t* p_node){
+	struct node_machine_t* l_machine = (struct node_machine_t*)nm_node_get_owner(p_node);
+
+	if (l_machine->_current_state){
+		l_machine->_current_state->_in_process(l_machine->_current_state);
+	}
+}
+
+static void _node_machine_in_render(struct node_t* p_node){
+	struct node_machine_t* l_machine = (struct node_machine_t*)nm_node_get_owner(p_node);
+
+	if (l_machine->_current_state){
+		l_machine->_current_state->_in_render(l_machine->_current_state);
+	}
 }
 
 static uint64_t _get_hash_key(const char* p_key){
