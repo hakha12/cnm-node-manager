@@ -10,7 +10,7 @@ struct node_t {
 
     // Child node container
 
-    struct node_t* _child[NM_CHILD_NODE];
+    struct node_t* _child[NM_ARRAY_INIT_CAPACITY];
 
     // Internal method that were automatically called
 
@@ -47,6 +47,20 @@ struct node_t {
     } _signal_hash[NM_SIGNAL_HASH];
 
 
+};
+
+struct node_array_t {
+	// Pointer to the root node
+	struct node_t* _root;
+
+	// Array of pointer to node
+	struct node_t** _data;
+
+	// Array size
+	size_t _size;
+
+	// Array capacity
+	size_t _capacity;
 };
 
 struct node_machine_t {
@@ -137,7 +151,7 @@ void* nm_node_get_parent_owner(nm_node_t* p_node){
 }
 
 void* nm_node_get_child_owner(nm_node_t* p_node, uint16_t p_index){
-    if (p_index >= NM_CHILD_NODE){
+    if (p_index >= NM_ARRAY_INIT_CAPACITY){
         return NULL;
     }
 
@@ -147,7 +161,7 @@ void* nm_node_get_child_owner(nm_node_t* p_node, uint16_t p_index){
 }
 
 bool nm_node_add_child(nm_node_t* p_parent, nm_node_t* p_child, uint16_t p_index){
-    if (p_index >= NM_CHILD_NODE){
+    if (p_index >= NM_ARRAY_INIT_CAPACITY){
         return false;
     }   
 
@@ -163,7 +177,7 @@ bool nm_node_add_child(nm_node_t* p_parent, nm_node_t* p_child, uint16_t p_index
 }
 
 void nm_node_remove_child(nm_node_t* p_parent, uint16_t p_index){
-    if (p_index >= NM_CHILD_NODE){
+    if (p_index >= NM_ARRAY_INIT_CAPACITY){
         return;
     }
     
@@ -183,7 +197,7 @@ nm_node_t* nm_node_get_parent(nm_node_t* p_node){
 }
 
 nm_node_t* nm_node_get_child(nm_node_t* p_node, uint16_t p_index){
-    if (p_index >= NM_CHILD_NODE){
+    if (p_index >= NM_ARRAY_INIT_CAPACITY){
         return NULL;
     }
 
@@ -302,6 +316,68 @@ void nm_node_emit_signal(nm_node_t* p_node, const char* p_signal_name){
     }
 }
 
+nm_node_array_t* nm_node_array_create(){
+	struct node_array_t* l_array = (struct node_array_t*)malloc(sizeof(struct node_array_t));
+
+	l_array->_root = nm_node_create(l_array, NULL, NULL, NULL, NULL, NULL, NULL);
+
+	l_array->_data = (struct node_t**)malloc( NM_ARRAY_INIT_CAPACITY * sizeof(struct node_t*));
+	memset(l_array->_data, 0, sizeof(l_array->_data));
+
+	l_array->_size = 0;
+	l_array->_capacity = NM_ARRAY_INIT_CAPACITY;
+
+	return l_array;
+}
+
+void nm_node_array_destroy(nm_node_array_t* p_array){
+	nm_node_destroy(p_array->_root);
+
+	for (size_t i = 0; i < p_array->_size; i++){
+		nm_node_destroy(p_array->_data[i]);
+	}
+
+	free(p_array->_data);
+
+	free(p_array);
+}
+
+nm_node_t* nm_node_array_get_root(nm_node_array_t* p_array){
+	return p_array->_root;
+}
+
+nm_node_t* nm_node_array_at(nm_node_array_t* p_array, size_t p_index){
+	if (p_index >= p_array->_size) return NULL;
+
+	return p_array->_data[p_index];
+}
+
+bool nm_node_array_is_empty(nm_node_array_t* p_array){
+	if (p_array->_size == 0) return true;
+
+	return false;
+}
+
+size_t nm_node_array_capacity(nm_node_array_t* p_array){
+	return p_array->_capacity;
+}
+
+size_t nm_node_array_size(nm_node_array_t* p_array){
+	return p_array->_size;
+}
+
+void nm_node_array_clear(nm_node_array_t* p_array){
+	if (p_array->_size == 0) return;
+
+	for (size_t i = 0; i < p_array->_size; i++){
+		nm_node_destroy(p_array->_data[i]);
+	}
+
+	memset(p_array->_data, 0, sizeof(p_array->_data));
+
+	p_array->_size = 0;
+}
+
 nm_node_machine_t* nm_node_machine_create(){
 	struct node_machine_t* l_machine = (struct node_machine_t*)malloc(sizeof(struct node_machine_t));
 
@@ -337,7 +413,7 @@ static void _node_in_init(struct node_t* p_node){
         p_node->_ext_init(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_init) continue;
 
         p_node->_child[i]->_in_init(p_node->_child[i]);
@@ -349,7 +425,7 @@ static void _node_in_destroy(struct node_t* p_node){
         p_node->_ext_destroy(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_destroy) continue;
 
         p_node->_child[i]->_in_destroy(p_node->_child[i]);
@@ -361,7 +437,7 @@ static void _node_in_awake(struct node_t* p_node){
         p_node->_ext_awake(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_awake) continue;
 
         p_node->_child[i]->_in_awake(p_node->_child[i]);
@@ -373,7 +449,7 @@ static void _node_in_sleep(struct node_t* p_node){
         p_node->_ext_sleep(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_sleep) continue;
 
         p_node->_child[i]->_in_sleep(p_node->_child[i]);
@@ -385,7 +461,7 @@ static void _node_in_process(struct node_t* p_node){
         p_node->_ext_process(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_process) continue;
 
         p_node->_child[i]->_in_process(p_node->_child[i]);
@@ -397,7 +473,7 @@ static void _node_in_render(struct node_t* p_node){
         p_node->_ext_render(p_node);
     }
 
-    for (int i = 0; i < NM_CHILD_NODE; i++){
+    for (int i = 0; i < NM_ARRAY_INIT_CAPACITY; i++){
         if (!p_node->_child[i] || !p_node->_child[i]->_in_render) continue;
 
         p_node->_child[i]->_in_render(p_node->_child[i]);
