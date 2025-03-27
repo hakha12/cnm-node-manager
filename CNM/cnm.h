@@ -11,8 +11,8 @@ extern "C" {
 #include <string.h>
 #include <stdbool.h>
 
-#ifndef NM_CHILD_NODE
-    #define NM_CHILD_NODE 16
+#ifndef NM_ARRAY_INIT_CAPACITY
+    #define NM_ARRAY_INIT_CAPACITY 16
 #endif
 
 #ifndef NM_CHAR_NAME
@@ -38,6 +38,8 @@ typedef void (*nm_node_method_t)(nm_node_t*);
 
 typedef struct node_machine_t nm_node_machine_t;
 
+typedef struct node_array_t nm_node_array_t;
+
 nm_node_t* nm_node_create(void* p_owner, nm_node_method_t p_init, nm_node_method_t p_destroy, nm_node_method_t p_awake, nm_node_method_t p_sleep, nm_node_method_t p_process, nm_node_method_t p_render);
 void nm_node_destroy(nm_node_t* p_node);
 
@@ -58,6 +60,22 @@ bool nm_node_add_signal(nm_node_t* p_node, const char* p_signal_name);
 bool nm_node_connect_signal(nm_node_t* p_node, const char* p_signal_name, const char* p_callback_name, nm_node_t* p_callback_node, nm_node_method_t p_callback_method);
 void nm_node_emit_signal(nm_node_t* p_node, const char* p_signal_name);
 void nm_node_remove_signal(nm_node_t* p_node, const char* p_signal_name);
+
+nm_node_array_t* nm_node_array_create();
+void nm_node_array_destroy(nm_node_array_t* p_array);
+
+nm_node_t* nm_node_array_get_root(nm_node_array_t* p_array);
+nm_node_t* nm_node_array_at(nm_node_array_t* p_array, size_t p_index);
+
+bool nm_node_array_is_empty(nm_node_array_t* p_array);
+size_t nm_node_array_size(nm_node_array_t* p_array);
+size_t nm_node_array_capacity(nm_node_array_t* p_array);
+
+void nm_node_array_clear(nm_node_array_t* p_array);
+void nm_node_array_insert_at(nm_node_array_t* p_array, nm_node_t* p_node, size_t p_index);
+void nm_node_array_erase_at(nm_node_array_t* p_array, size_t p_index);
+void nm_node_array_push_back(nm_node_array_t* p_array, nm_node_t* p_node);
+void nm_node_array_pop_back(nm_node_array_t* p_array);
 
 nm_node_machine_t* nm_node_machine_create();
 void nm_node_machine_destroy(nm_node_machine_t* p_machine);
