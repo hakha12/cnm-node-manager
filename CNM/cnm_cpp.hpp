@@ -41,12 +41,6 @@ namespace nm {
 	using node_t = std::shared_ptr<node>;
 	using node_callback_t = std::function<void()>;
 
-	using node_array_t = std::vector<node_t>;
-	using node_list_t = std::list<node_t>;
-
-	template<typename _Tk>
-	using node_hash_t = std::unordered_map<_Tk, node_t>;
-
 	using callback_hash = std::unordered_map<std::string, node_callback_t>;
 	
 	class node {
@@ -55,32 +49,42 @@ namespace nm {
 			static node_t create(_Targs&&... args){
 				std::type_index l_type(typeid(_Tn));
 
-				if (get_node_factory<_Targs...>().find(l_type) == get_node_factory<_Targs...>().end()){
-					get_node_factory<_Targs...>()[l_type] = [](auto&&... params) -> node_t {
+				if (_get_node_factory<_Targs...>().find(l_type) == _get_node_factory<_Targs...>().end()){
+					_get_node_factory<_Targs...>()[l_type] = [](auto&&... params) -> node_t {
 						node_t l_node = std::make_shared<_Tn>();
 						l_node->init(std::forward<decltype(params)>(params)...);
+						
 						return l_node;
 					};
 				}
 	
-				return std::invoke(get_node_factory<_Targs...>()[l_type], std::forward<_Targs>(args)...);
+				return std::invoke(_get_node_factory<_Targs...>()[l_type], std::forward<_Targs>(args)...);
 			}	
 
 			virtual ~node(){
 				destroy();
 			}
 
-			virtual void init(){}
-			virtual void destroy(){}
+			void call_awake(){
+				_internal_awake();
+			}
 
-			virtual void awake(){}
-			virtual void sleep(){}
+			void call_sleep(){
+				_internal_sleep();
+			}
 
-			virtual void process(){}
-			virtual void render(){}
+			void call_process(){
+				_internal_process();
+			}
+
+			void call_render(){
+				_internal_render();
+			}
 
 			bool add_child(node_t p_child, const uint16_t p_index){
 				if (m_child_list.find(p_index) != m_child_list.end()) return false;
+
+				p_child->m_parent = this;
 
 				return m_child_list.emplace(p_index, p_child).second;
 			}
@@ -94,7 +98,7 @@ namespace nm {
 			node_t get_parent(){
 				if (!m_parent) return nullptr;
 
-				return m_parent;
+				return node_t(m_parent);
 			}
 
 			node_t get_child(const uint16_t p_index){
@@ -118,7 +122,6 @@ namespace nm {
 				if (l_signal == m_signal_list.end()) return false;
 
 				callback_hash& l_callback_list = l_signal->second;
-
 				node_callback_t l_callback = [p_instance, p_callback_method](){(p_instance->*p_callback_method)();};
 
 				return l_callback_list.emplace(p_callback_name, l_callback).second;
@@ -139,18 +142,116 @@ namespace nm {
 
 				m_signal_list.erase(p_signal_name);
 			}
+		
+		protected:
+			virtual void init(){}
+			virtual void destroy(){}
+
+			virtual void awake(){}
+			virtual void sleep(){}
+
+			virtual void process(){}
+			virtual void render(){}
 
 		private:			
-			node_t m_parent;
+			node* m_parent;
 			std::map<uint16_t, node_t> m_child_list;
 			std::unordered_map<std::string, callback_hash> m_signal_list;
 
+			void _internal_awake(){
+				awake();
+
+				for (auto const& [l_index, l_child] : m_child_list){
+					if (!l_child) continue;
+
+					l_child->_internal_awake();
+				}
+			}
+
+			void _internal_sleep(){
+				sleep();
+
+				for (auto const& [l_index, l_child] : m_child_list){
+					if (!l_child) continue;
+
+					l_child->_internal_sleep();
+				}
+			}
+
+			void _internal_process(){
+				process();
+
+				for (auto const& [l_index, l_child] : m_child_list){
+					if (!l_child) continue;
+
+					l_child->_internal_process();
+				}
+			}
+
+			void _internal_render(){
+				render();
+
+				for (auto const& [l_index, l_child] : m_child_list){
+					if (!l_child) continue;
+
+					l_child->_internal_render();
+				}
+			}
+
 			template<typename... _Targs>
-			static std::unordered_map<std::type_index, std::function<node_t(_Targs...)>>& get_node_factory(){
+			static std::unordered_map<std::type_index, std::function<node_t(_Targs...)>>& _get_node_factory(){
 				static std::unordered_map<std::type_index, std::function<node_t(_Targs...)>> l_node_factory;
 
 				return l_node_factory;
 			}
+	};
+	class node_machine : public node {
+		public:
+			bool add_state(node_t p_node, uint16_t p_index){
+				if (m_state_list.find(p_index) != m_state_list.end()) return false;
+
+				return m_state_list.emplace(p_index, p_node).second;
+			}
+
+			void remove_state(uint16_t p_index){
+				if (m_state_list.find(p_index) == m_state_list.end()) return;
+
+				m_state_list.erase(p_index);
+			}
+
+			bool set_current_state(uint16_t p_index){
+				if (m_state_list.find(p_index) == m_state_list.end()) return false;
+
+				m_current_state->call_sleep();
+
+				node_t l_new_state = m_state_list.find(p_index)->second;
+				l_new_state->call_awake();
+
+				m_current_state = l_new_state;
+
+				return true;
+			}
+
+		protected:
+			virtual void init(){
+				m_current_state = nullptr;
+			}
+
+			virtual void process(){
+				if (!m_current_state) return;
+
+				m_current_state->call_process();
+			}
+
+			virtual void render(){
+				if (!m_current_state) return;
+
+				m_current_state->call_render();
+			}
+
+		private:
+			std::unordered_map<uint16_t, node_t> m_state_list;
+			node_t m_current_state;
 	};
 }
 
