@@ -36,8 +36,10 @@ SOFTWARE.
 
 
 namespace nm {
+	// Base node class
 	class node;
 
+	// Type aliasing for node pointer
 	using node_t = std::shared_ptr<node>;
 	using node_callback_t = std::function<void()>;
 
@@ -45,6 +47,11 @@ namespace nm {
 	
 	class node {
 		public:
+			/*
+			 *	Create a node object based on the inputted class.
+			 *
+			 *  Return a smart pointer to the created node.
+			 */ 
 			template<class _Tn, typename... _Targs>
 			static node_t create(_Targs&&... args){
 				std::type_index l_type(typeid(_Tn));
@@ -61,26 +68,59 @@ namespace nm {
 				return std::invoke(_get_node_factory<_Targs...>()[l_type], std::forward<_Targs>(args)...);
 			}	
 
+			/*
+			 *	The node class virtual destructor
+			 */
 			virtual ~node(){
 				destroy();
 			}
 
+			/*
+			 *	Manually call the node's awake() method.
+			 *
+			 * 	Automatically called if a node is set as the current node by node_machine, or
+			 * 	when this node's parent call this method.
+			 */
 			void call_awake(){
 				_internal_awake();
 			}
 
+			/*
+			 *	Manually call the node's sleep() method.
+			 *
+			 * 	Automatically called if a node is set as the current node by node_machine, or
+			 * 	when this node's parent call this method.
+			 */			
 			void call_sleep(){
 				_internal_sleep();
 			}
 
+			/*
+			 *	Manually call the node's process() method.
+			 *
+			 * 	Automatically called if a node_machine called the process() method with this node as the current one, or
+			 * 	when this node's parent call this method.
+			 */	
 			void call_process(){
 				_internal_process();
 			}
 
+			/*
+			 *	Manually call the node's render() method.
+			 *
+			 * 	Automatically called if a node_machine called the render() method with this node as the current one, or
+			 * 	when this node's parent call this method.
+			 */	
 			void call_render(){
 				_internal_render();
 			}
 
+			/*
+			 *	Add a child node to this node at the specified index and set this node as the parent of the child node. 
+			 *	The index specify the order of the child node's method call.
+			 *  
+			 * 	Return a boolean value to indicate whether the addition is succesful or not.
+			 */
 			bool add_child(node_t p_child, const uint16_t p_index){
 				if (m_child_list.find(p_index) != m_child_list.end()) return false;
 
@@ -89,24 +129,44 @@ namespace nm {
 				return m_child_list.emplace(p_index, p_child).second;
 			}
 
+			/*
+			 *	Remove a child node at the specified index.
+			 *
+			 * 	Note that this won't automatically delete the child node if it still in use somewhere else.
+			 */	
 			void remove_child(const uint16_t p_index){
 				if (m_child_list.find(p_index) == m_child_list.end()) return;
 
 				m_child_list.erase(p_index);
 			}
 
+			/*
+			 *	Get the parent node, if any.
+			 *
+			 * 	Return a pointer to the parent node if the parent exist and nullptr otherwise.
+			 */	
 			node_t get_parent(){
 				if (!m_parent) return nullptr;
 
 				return node_t(m_parent);
 			}
 
+			/*
+			 *	Get the child node at the specified index.
+			 *
+			 * 	Return a pointer to the child node if the child exist and nullptr otherwise.
+			 */	
 			node_t get_child(const uint16_t p_index){
 				if (m_child_list.find(p_index) == m_child_list.end()) return nullptr;
 
 				return m_child_list.find(p_index)->second;
 			}
 
+			/*
+			 *	Add a signal to the node. Signal is a way for a node to transmit message to another node.
+			 *
+			 * 	Return a boolean value to indicate whether the addition is succesful or not.
+			 */	
 			bool add_signal(const std::string& p_signal_name){
 				if (m_signal_list.find(p_signal_name) != m_signal_list.end()) return false;
 
@@ -115,6 +175,11 @@ namespace nm {
 				return m_signal_list.emplace(p_signal_name, l_callback_list).second;
 			}
 
+			/*
+			 *	Add a callback method to be executed when a signal is emitted.
+			 *
+			 * 	Return a boolean value to indicate whether the addition is succesful or not.
+			 */	
 			template <class _Tn>
 			bool add_callback(const std::string& p_signal_name, const std::string& p_callback_name, void(_Tn::*p_callback_method)(), _Tn* p_instance){
 				auto l_signal = m_signal_list.find(p_signal_name);
@@ -127,6 +192,9 @@ namespace nm {
 				return l_callback_list.emplace(p_callback_name, l_callback).second;
 			}
 
+			/*
+			 *	Emit the specified signal and execute all of the associated callback method.
+			 */	
 			void emit_signal(const std::string& p_signal_name){
 				auto l_signal = m_signal_list.find(p_signal_name);
 
@@ -137,6 +205,9 @@ namespace nm {
 				}
 			}
 
+			/*
+			 *	Remove the specified signal from the node.
+			 */	
 			void remove_signal(const std::string& p_signal_name){
 				if (m_signal_list.find(p_signal_name) == m_signal_list.end()) return;
 
@@ -144,13 +215,46 @@ namespace nm {
 			}
 		
 		protected:
+			/*
+			 *	Define the init() method.
+			 *
+			 * 	init() acts like the constructor and will be automatically called at the node creation.
+			 */	
 			virtual void init(){}
+
+			/*
+			 *	Define the destroy() method.
+			 *
+			 * 	destroy() acts like the destructor and will be automatically called at the node deletion.
+			 */	
 			virtual void destroy(){}
 
+			/*
+			 *	Define the awake() method.
+			 *
+			 * 	The method will be called with call_awake().
+			 */	
 			virtual void awake(){}
+
+			/*
+			 *	Define the sleep() method.
+			 *
+			 * 	The method will be called with call_sleep().
+			 */	
 			virtual void sleep(){}
 
+			/*
+			 *	Define the process() method.
+			 *
+			 * 	The method will be called with call_process().
+			 */	
 			virtual void process(){}
+
+			/*
+			 *	Define the render() method.
+			 *
+			 * 	The method will be called with call_render().
+			 */	
 			virtual void render(){}
 
 		private:			
