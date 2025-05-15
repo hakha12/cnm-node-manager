@@ -311,18 +311,31 @@ namespace nm {
 	};
 	class node_machine : public node {
 		public:
+			/*
+			 *	Add a node as a state in the specified index
+			 *
+			 * 	Return a boolean value to indicate whether the addition is succesful or not.
+			 */	
 			bool add_state(node_t p_node, uint16_t p_index){
 				if (m_state_list.find(p_index) != m_state_list.end()) return false;
 
 				return m_state_list.emplace(p_index, p_node).second;
 			}
 
+			/*
+			 *	Remove a node at the specified index from the state list.
+			 */	
 			void remove_state(uint16_t p_index){
 				if (m_state_list.find(p_index) == m_state_list.end()) return;
 
 				m_state_list.erase(p_index);
 			}
 
+			/*
+			 *	Set a node at the specified index as the active state
+			 *
+			 * 	Return a boolean value to indicate whether the operation is succesful or not.
+			 */	
 			bool set_current_state(uint16_t p_index){
 				if (m_state_list.find(p_index) == m_state_list.end()) return false;
 
@@ -337,16 +350,31 @@ namespace nm {
 			}
 
 		protected:
+			/*
+			 *	Define the node_machine's own init() method.
+			 *
+			 * 	init() acts like the constructor and will be automatically called at the node creation.
+			 */	
 			virtual void init(){
 				m_current_state = nullptr;
 			}
 
+			/*
+			 *	Define the node_machine's own process() method.
+			 *
+			 * 	The method will be called with call_process().
+			 */	
 			virtual void process(){
 				if (!m_current_state) return;
 
 				m_current_state->call_process();
 			}
 
+			/*
+			 *	Define the node_machine's own render() method.
+			 *
+			 * 	The method will be called with call_render().
+			 */	
 			virtual void render(){
 				if (!m_current_state) return;
 
